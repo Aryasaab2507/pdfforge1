@@ -3,6 +3,7 @@ services:
     name: pdfforge-api
     runtime: docker
     plan: free
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/pdf/health
