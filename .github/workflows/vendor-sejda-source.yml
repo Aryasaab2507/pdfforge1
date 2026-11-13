@@ -6,6 +6,12 @@ on:
       - feature/sejda-render-backend
     paths:
       - .github/workflows/vendor-sejda-source.yml
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/vendor-sejda-source.yml
   workflow_dispatch:
 
 permissions:
