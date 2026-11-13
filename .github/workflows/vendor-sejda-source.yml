@@ -1,0 +1,58 @@
+name: Vendor Sejda source
+
+on:
+  push:
+    branches:
+      - feature/sejda-render-backend
+    paths:
+      - .github/workflows/vendor-sejda-source.yml
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/vendor-sejda-source.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  vendor-sejda:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out PDFforge feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/sejda-render-backend
+          fetch-depth: 1
+
+      - name: Download and verify the Sejda source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch master https://github.com/torakiki/sejda.git /tmp/sejda
+          version="$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' /tmp/sejda/pom.xml | head -n 1)"
+          if [[ "$version" != "5.1.28-SNAPSHOT" ]]; then
+            echo "Expected Sejda 5.1.28-SNAPSHOT but upstream reports $version"
+            exit 1
+          fi
+          rm -rf sejda-source
+          mkdir -p sejda-source
+          rsync -a --delete --exclude='.git' /tmp/sejda/ sejda-source/
+          git -C /tmp/sejda rev-parse HEAD > sejda-source/UPSTREAM_COMMIT.txt
+          printf 'Vendored Sejda version: %s\n' "$version" > sejda-source/UPSTREAM_VERSION.txt
+
+      - name: Commit complete source tree to the feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sejda-source
+          if git diff --cached --quiet; then
+            echo "Sejda source tree is already current."
+            exit 0
+          fi
+          git commit -m "Vendor complete Sejda 5.1.28 source tree"
+          git push origin HEAD:feature/sejda-render-backend
