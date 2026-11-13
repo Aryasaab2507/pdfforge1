@@ -1,0 +1,118 @@
+/*
+ * Created on 17 dic 2015
+ * Copyright 2015 by Andrea Vacondio (andrea.vacondio@gmail.com).
+ * This file is part of Sejda.
+ *
+ * Sejda is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Sejda is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with Sejda.  If not, see <http://www.gnu.org/licenses/>.
+ */
+package org.sejda.impl.sambox;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.sejda.model.input.PdfSource;
+import org.sejda.model.output.DirectoryTaskOutput;
+import org.sejda.model.output.ExistingOutputPolicy;
+import org.sejda.model.parameter.UnpackParameters;
+import org.sejda.model.task.Task;
+import org.sejda.sambox.cos.COSDictionary;
+import org.sejda.sambox.pdmodel.PDDocument;
+import org.sejda.sambox.pdmodel.PDDocumentNameDictionary;
+import org.sejda.sambox.pdmodel.PDEmbeddedFilesNameTreeNode;
+import org.sejda.sambox.pdmodel.PDPage;
+import org.sejda.sambox.pdmodel.common.filespecification.PDComplexFileSpecification;
+import org.sejda.sambox.pdmodel.common.filespecification.PDEmbeddedFile;
+import org.sejda.tests.tasks.BaseTaskTest;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.sejda.tests.TestUtils.customInput;
+
+/**
+ * @author Andrea Vacondio
+ */
+public class UnpackSamboxTaskTest extends BaseTaskTest<UnpackParameters> {
+
+    private UnpackParameters parameters;
+    @TempDir
+    public Path folder;
+
+    @Test
+    public void unpackAnnotations() throws IOException {
+        executeTest(customInput("pdf/attachments_as_annots.pdf"));
+    }
+
+    @Test
+    public void unpackNamedTree() throws IOException {
+        executeTest(customInput("pdf/attachments_as_named_tree.pdf"));
+    }
+
+    public void executeTest(PdfSource source) throws IOException {
+        File out = Files.createTempDirectory(folder, "sejda").toFile();
+        parameters = new UnpackParameters(new DirectoryTaskOutput(out));
+        parameters.addSource(source);
+        parameters.setExistingOutputPolicy(ExistingOutputPolicy.OVERWRITE);
+        execute(parameters);
+        assertEquals(1, out.list().length);
+    }
+
+    @Test
+    public void unpackMustNotWriteOutsideOutputDirectory() throws IOException {
+        Path escapeTarget = folder.resolve("PWNED_regression.txt");
+
+        String attachmentName = "../PWNED_regression.txt";
+        executeTest(customInput(craftMaliciousPdf(attachmentName, "zip-slip-regression".getBytes(StandardCharsets.UTF_8)), "malicious.pdf"));
+
+        assertFalse(Files.exists(escapeTarget),
+                "Path traversal: attachment was written outside the output directory at "
+                        + escapeTarget.toAbsolutePath());
+    }
+
+    private PDDocument craftMaliciousPdf(String attachmentName, byte[] payload) throws IOException {
+        PDDocument doc = new PDDocument();
+        doc.addPage(new PDPage());
+
+        PDEmbeddedFile embedded = new PDEmbeddedFile(new ByteArrayInputStream(payload));
+        embedded.setSize(payload.length);
+
+        PDComplexFileSpecification spec = new PDComplexFileSpecification(new COSDictionary());
+        spec.setFile(attachmentName);
+        spec.setFileUnicode(attachmentName);
+        spec.setEmbeddedFile(embedded);
+
+        PDEmbeddedFilesNameTreeNode efTree = new PDEmbeddedFilesNameTreeNode();
+        Map<String, PDComplexFileSpecification> names = new HashMap<>();
+        names.put("attachment", spec);
+        efTree.setNames(names);
+
+        PDDocumentNameDictionary nameDict = new PDDocumentNameDictionary(doc.getDocumentCatalog());
+        nameDict.setEmbeddedFiles(efTree);
+        doc.getDocumentCatalog().setNames(nameDict);
+
+        return doc;
+    }
+
+    @Override
+    public Task<UnpackParameters> getTask() {
+        return new UnpackTask();
+    }
+
+}
