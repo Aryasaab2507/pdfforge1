@@ -4,22 +4,25 @@ This repository contains a Docker-based Render service definition.
 
 ## What is included
 - Spring Boot application under `backend/pdfforge-backend`
-- Sejda merge adapter using the source APIs from Sejda 5.1.28-SNAPSHOT
-- `POST /api/pdf/merge`: multipart form field `files`, accepts 2–20 PDF files (50 MB per file)
-- `GET /api/pdf/health`: health-check endpoint
-- Docker build that clones the upstream Sejda source tree, adds the PDFforge backend module to its Maven reactor, and builds the executable jar
+- Complete Sejda 5.1.28-SNAPSHOT source under `sejda-source/`
+- `POST /api/pdf/merge`: multipart field `files`, accepts 2–20 PDF files (50 MB per file)
+- `GET /api/pdf/health`: public health-check endpoint
+- Merge endpoint protected by the `X-PDFForge-API-Key` request header
+- Docker build that compiles the vendored Sejda source and PDFforge backend in one Maven reactor
 
 ## Deploy
-1. In Render, choose **New > Blueprint**.
-2. Connect this repository and select the branch containing this configuration.
-3. Review the service and plan in the Blueprint preview before applying it.
-4. Wait for the Docker build and confirm the service health check at `/api/pdf/health`.
+1. In Render, create or sync the PDFforge Blueprint from `render.yaml`.
+2. Supply a secret value for `PDFFORGE_API_KEY` in the service environment.
+3. Wait for the Docker build and confirm the health check at `/api/pdf/health`.
+
+## API use
+Send the secret in the `X-PDFForge-API-Key` header when calling `POST /api/pdf/merge`. Never put this key in browser-visible JavaScript. A same-origin server-side proxy on the frontend should read the key from a server-only environment variable.
 
 ## Build status
-The code has not been compiled in the ChatGPT execution environment. The first Docker build on Render is the compile verification. If Maven fails, use the Render build log to diagnose and fix the exact error before treating the service as deployed.
+Compilation and real PDF merge integration tests must be confirmed by the Render Docker build and a test request after deployment.
 
 ## Security and privacy
-The initial endpoint does not yet include user authentication or persistent storage. Do not expose it for general public use until access control, request throttling, and production file-handling controls are added. Uploaded files are written to temporary disk locations and deleted after the merge response is prepared.
+The merge route rejects requests unless a valid API key is configured and supplied. Uploaded files are written to temporary disk files and deleted after the merge response is prepared. Authentication and upload throttling are still MVP-level; keep access restricted until the frontend proxy and additional abuse controls are in place.
 
 ## Licensing
-The Sejda SDK 2.x and later is licensed under AGPL-3.0. This build downloads and builds the upstream source; keep its LICENSE and attribution notices, and review AGPL obligations before making this service available over a network or using it in a closed-source product.
+The Sejda source is licensed under AGPL-3.0. Preserve the upstream license and attribution notices and review network-use/source-disclosure obligations before production use.
