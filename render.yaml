@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: pdfforge-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/pdf/health
+    envVars:
+      - key: PORT
+        value: "8080"
