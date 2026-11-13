@@ -1,9 +1,9 @@
 package com.pdfforge.sejda;
 
 import org.sejda.core.service.DefaultTaskExecutionService;
-import org.sejda.core.support.io.model.FileOutput;
 import org.sejda.model.input.PdfFileSource;
 import org.sejda.model.input.PdfMergeInput;
+import org.sejda.model.output.FileTaskOutput;
 import org.sejda.model.parameter.MergeParameters;
 
 import java.io.File;
@@ -28,7 +28,8 @@ public final class SejdaMergeService {
                 }
                 parameters.addInput(new PdfMergeInput(PdfFileSource.newInstanceNoPassword(input)));
             }
-            parameters.setOutput(FileOutput.file(output).name("merged.pdf"));
+            // MergeParameters#setOutput expects the model-layer SingleTaskOutput.
+            parameters.setOutput(new FileTaskOutput(output));
             execution.execute(parameters);
 
             if (!output.isFile() || output.length() == 0) {
