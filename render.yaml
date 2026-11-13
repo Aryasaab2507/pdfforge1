@@ -9,3 +9,5 @@ services:
     envVars:
       - key: PORT
         value: "8080"
+      - key: PDFFORGE_API_KEY
+        sync: false
